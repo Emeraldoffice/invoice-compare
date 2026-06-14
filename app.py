@@ -24,15 +24,28 @@ with col2:
 
 if inner_file and outer_file:
     st.divider()
+
+    # ── 偵測內帳工作表 ────────────────────────────────────────────────────
+    inner_file.seek(0)
+    xl_inner = pd.ExcelFile(inner_file)
+    inner_sheets = xl_inner.sheet_names
+    default_sheet = "進項" if "進項" in inner_sheets else inner_sheets[0]
+    inner_sheet = st.selectbox(
+        "📋 請選擇內帳工作表",
+        options=inner_sheets,
+        index=inner_sheets.index(default_sheet),
+    )
+
     if st.button("🔍 開始比對", use_container_width=True, type="primary"):
         with st.spinner("比對中，請稍候…"):
 
             # ── 讀取內帳 ──────────────────────────────────────────────────
             try:
-                df_inner = pd.read_excel(inner_file, sheet_name="進項", header=0)
+                inner_file.seek(0)
+                df_inner = pd.read_excel(inner_file, sheet_name=inner_sheet, header=0)
                 df_inner["發票號碼"] = df_inner["發票號碼"].astype(str).str.strip()
             except Exception as e:
-                st.error(f"讀取內帳失敗：{e}\n請確認工作表名稱為「進項」")
+                st.error(f"讀取內帳失敗：{e}")
                 st.stop()
 
             # ── 讀取外帳 ──────────────────────────────────────────────────
