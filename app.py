@@ -226,11 +226,18 @@ def load_inner(f):
 
 
 def load_outer(f):
-    """讀取外帳：第2行標題、第3行起資料，欄位名「發票號碼」"""
+    """讀取外帳：自動偵測標題列（掃描前5列），欄位名「發票號碼」"""
     f.seek(0)
     raw = pd.read_excel(f, sheet_name=0, header=None)
-    df = raw.iloc[2:].copy()
-    df.columns = [str(c) for c in raw.iloc[1].tolist()]
+    # 自動找含「發票號碼」的標題列
+    header_row = 1  # 預設：第2列為標題
+    for i in range(min(5, len(raw))):
+        vals = [str(v) for v in raw.iloc[i].tolist()]
+        if "發票號碼" in vals or any("發票" in v and "號" in v for v in vals):
+            header_row = i
+            break
+    df = raw.iloc[header_row + 1:].copy()
+    df.columns = [str(c) for c in raw.iloc[header_row].tolist()]
     df = df.reset_index(drop=True)
     if "發票號碼" not in df.columns:
         guess = next((c for c in df.columns if "發票" in c and "號" in c), None) or \
