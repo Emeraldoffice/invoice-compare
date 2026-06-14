@@ -14,7 +14,7 @@ st.divider()
 
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("**📁 內帳（進銷項發票）**"
+    st.markdown("**📁 內帳（進銷項發票）**")
     inner_file = st.file_uploader("上傳內帳 xlsx", type=["xlsx"], key="inner",
                                    label_visibility="collapsed")
 with col2:
