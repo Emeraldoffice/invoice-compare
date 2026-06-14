@@ -6,7 +6,7 @@ from openpyxl.utils import get_column_letter
 import io
 
 
-# ── 報告產生函式（必須在呼叫前定義）────────────────────────────────────────
+# ── 報告產生函式 ──────────────────────────────────────────────────────────────
 def _build_report(df_inner, df_outer, only_inner, only_outer, both):
     wb = Workbook()
 
@@ -47,7 +47,6 @@ def _build_report(df_inner, df_outer, only_inner, only_outer, both):
         cell.alignment = al or AL_L
 
     def sc(row, col, default=""):
-        """安全取欄位值，欄位不存在或為空時返回預設值"""
         if col in row.index and pd.notna(row[col]):
             return row[col]
         return default
@@ -64,7 +63,6 @@ def _build_report(df_inner, df_outer, only_inner, only_outer, both):
     t.fill = FILL_HDR; t.alignment = AL_C
     ws1.row_dimensions[1].height = 28
 
-    # 計算已確認/作廢數量（若無「發票狀態」欄則視所有為已確認）
     if "發票狀態" in df_inner.columns:
         inner_valid = 0
         for inv in only_inner:
@@ -138,13 +136,9 @@ def _build_report(df_inner, df_outer, only_inner, only_outer, both):
         is_void = sc(row, "發票狀態") == "作廢已確認"
         fill = FILL_VOID if is_void else FILL_INNER
         for c, v in enumerate([
-            sc(row, "發票號碼"),
-            sc(row, "發票狀態"),
-            str(sc(row, "發票日期"))[:10],
-            sc(row, "賣方名稱"),
-            sc(row, "銷售額合計"),
-            sc(row, "營業稅"),
-            sc(row, "總計"),
+            sc(row, "發票號碼"), sc(row, "發票狀態"),
+            str(sc(row, "發票日期"))[:10], sc(row, "賣方名稱"),
+            sc(row, "銷售額合計"), sc(row, "營業稅"), sc(row, "總計"),
         ], 1):
             write_cell(ws2, r, c, v, fill)
 
@@ -166,11 +160,8 @@ def _build_report(df_inner, df_outer, only_inner, only_outer, both):
             inv,
             str(sc(row, "憑證日期"))[:10] if sc(row, "憑證日期") != "" else "",
             str(sc(row, "收支日期"))[:10] if sc(row, "收支日期") != "" else "",
-            sc(row, "對象"),
-            sc(row, "發票金額"),
-            sc(row, "稅額"),
-            sc(row, "銷售額"),
-            sc(row, "附註說明"),
+            sc(row, "對象"), sc(row, "發票金額"),
+            sc(row, "稅額"), sc(row, "銷售額"), sc(row, "附註說明"),
         ], 1):
             write_cell(ws3, r, c, v, fill)
 
@@ -203,11 +194,9 @@ def _build_report(df_inner, df_outer, only_inner, only_outer, both):
             for c, v in enumerate([
                 inv,
                 str(i_date)[:10] if i_date != "" else "",
-                sc(inner_row, "賣方名稱"),
-                i_total,
+                sc(inner_row, "賣方名稱"), i_total,
                 str(o_date)[:10] if o_date != "" else "",
-                sc(o_row, "對象"),
-                o_total,
+                sc(o_row, "對象"), o_total,
                 diff if abs(diff) > 0.5 else "",
             ], 1):
                 write_cell(ws4, r, c, v, fill)
@@ -216,17 +205,53 @@ def _build_report(df_inner, df_outer, only_inner, only_outer, both):
     return wb
 
 
-# ── 頁面設定 ──────────────────────────────────────────────────────────────
-st.set_page_config(page_title="翡閣進項發票比對工具", page_icon="🧾", layout="centered")
+def load_inner(f):
+    """讀取內帳：自動選「進項」工作表，欄位名「發票號碼」"""
+    f.seek(0)
+    sheets = pd.ExcelFile(f).sheet_names
+    sheet = "進項" if "進項" in sheets else sheets[0]
+    f.seek(0)
+    df = pd.read_excel(f, sheet_name=sheet, header=0)
+    df.columns = [str(c) for c in df.columns]
+    if "發票號碼" not in df.columns:
+        # 嘗試找含「發票」和「號」的欄位
+        guess = next((c for c in df.columns if "發票" in c and "號" in c), None) or \
+                next((c for c in df.columns if "發票" in c), None)
+        if guess:
+            df = df.rename(columns={guess: "發票號碼�})
+        else:
+            raise ValueError(f"找不到發票號碼欄位，現有欄位：{list(df.columns)}")
+    df["發票號碼"] = df["發票號碼"].astype(str).str.strip()
+    return df, sheet
 
+
+def load_outer(f):
+    """讀取外帳：第2行標題、第3行起資料，欄位名「發票號碼」"""
+    f.seek(0)
+    raw = pd.read_excel(f, sheet_name=0, header=None)
+    df = raw.iloc[2:].copy()
+    df.columns = [str(c) for c in raw.iloc[1].tolist()]
+    df = df.reset_index(drop=True)
+    if "發票號碼" not in df.columns:
+        guess = next((c for c in df.columns if "發票" in c and "號" in c), None) or \
+                next((c for c in df.columns if "發票" in c), None)
+        if guess:
+            df = df.rename(columns={guess: "發票號碼�})
+        else:
+            raise ValueError(f"找不到發票號碼欄位，現有欄位：{list(df.columns)}")
+    df["發票號碼"] = df["發票號碼"].astype(str).str.strip()
+    return df
+
+
+# ── 頁面 ──────────────────────────────────────────────────────────────────────
+st.set_page_config(page_title="翡閣進項發票比對工具", page_icon="🧾", layout="centered")
 st.title("🧾 翡閣進項發票比對工具")
 st.caption("上傳內帳與外帳 Excel，自動產生差異報告")
-
 st.divider()
 
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("**📁 內帳（進銷項發票���**")
+    st.markdown("**📁 內帳（進銷項發票）**")
     inner_file = st.file_uploader("上傳內帳 xlsx", type=["xlsx"], key="inner",
                                    label_visibility="collapsed")
 with col2:
@@ -236,87 +261,31 @@ with col2:
 
 if inner_file and outer_file:
     st.divider()
-
-    # ── 偵測內帳工作表與欄位 ──────────────────────────────────────────────
-    inner_file.seek(0)
-    xl_inner = pd.ExcelFile(inner_file)
-    inner_sheets = xl_inner.sheet_names
-    default_sheet = "進項" if "進項" in inner_sheets else inner_sheets[0]
-    inner_sheet = st.selectbox(
-        "📋 請選擇內帳工作表",
-        options=inner_sheets,
-        index=inner_sheets.index(default_sheet),
-    )
-
-    inner_file.seek(0)
-    df_inner_preview = pd.read_excel(inner_file, sheet_name=inner_sheet, header=0, nrows=0)
-    inner_cols = df_inner_preview.columns.tolist()
-
-    inv_guess = next((c for c in inner_cols if "發票" in str(c) and "號" in str(c)), None) or \
-                next((c for c in inner_cols if "發票" in str(c)), None) or inner_cols[0]
-    inner_inv_col = st.selectbox(
-        "🔢 請選擇「發票號碼」欄位（內帳）",
-        options=inner_cols,
-        index=inner_cols.index(inv_guess),
-    )
-
-    # ── 偵測外帳欄位 ──────────────────────────────────────────────────────
-    outer_file.seek(0)
-    outer_raw_preview = pd.read_excel(outer_file, sheet_name=0, header=None, nrows=3)
-    outer_cols = outer_raw_preview.iloc[1].tolist()
-    outer_cols_str = [str(c) for c in outer_cols]
-
-    outer_inv_guess = next((c for c in outer_cols_str if "發票" in c and "號" in c), None) or \
-                      next((c for c in outer_cols_str if "發票" in c), None) or outer_cols_str[0]
-    outer_inv_col = st.selectbox(
-        "🔢 請選擇「發票號碼」欄位（外帳）",
-        options=outer_cols_str,
-        index=outer_cols_str.index(outer_inv_guess),
-    )
-
     if st.button("🔍 開始比對", use_container_width=True, type="primary"):
         with st.spinner("比對中，請稍候…"):
-
-            # ── 讀取內帳 ──────────────────────────────────────────────────
             try:
-                inner_file.seek(0)
-                df_inner = pd.read_excel(inner_file, sheet_name=inner_sheet, header=0)
-                df_inner.columns = [str(c) for c in df_inner.columns]
-                if inner_inv_col != "發票號碼":
-                    df_inner = df_inner.rename(columns={inner_inv_col: "發票號碼"})
-                df_inner["發票號碼"] = df_inner["發票號碼"].astype(str).str.strip()
+                df_inner, sheet_used = load_inner(inner_file)
             except Exception as e:
                 st.error(f"讀取內帳失敗：{e}")
                 st.stop()
 
-            # ── 讀取外帳 ──────────────────────────────────────────────────
             try:
-                outer_file.seek(0)
-                outer_raw = pd.read_excel(outer_file, sheet_name=0, header=None)
-                df_outer = outer_raw.iloc[2:].copy()
-                df_outer.columns = [str(c) for c in outer_raw.iloc[1].tolist()]
-                df_outer = df_outer.reset_index(drop=True)
-                if outer_inv_col != "發票號碼":
-                    df_outer = df_outer.rename(columns={outer_inv_col: "發票號碼"})
-                df_outer["發票號碼"] = df_outer["發票號碼"].astype(str).str.strip()
+                df_outer = load_outer(outer_file)
             except Exception as e:
                 st.error(f"讀取外帳失敗：{e}")
                 st.stop()
 
-            # ── 差異計算 ───────────────────────────────────────────────────
             inner_all = set(df_inner["發票號碼"])
             outer_all = set(df_outer["發票號碼"])
             only_inner = inner_all - outer_all
             only_outer = outer_all - inner_all
             both = inner_all & outer_all
 
-            # ── 摘要顯示 ───────────────────────────────────────────────────
             c1, c2, c3 = st.columns(3)
             c1.metric("內帳有、外帳沒有", len(only_inner))
             c2.metric("外帳有、內帳沒有", len(only_outer))
             c3.metric("兩邊吻合", len(both))
 
-            # ── 產生 Excel ─────────────────────────────────────────────────
             try:
                 wb = _build_report(df_inner, df_outer, only_inner, only_outer, both)
             except Exception as e:
