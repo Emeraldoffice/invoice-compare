@@ -5,16 +5,16 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import io
 
-st.set_page_config(page_title="進項發票比對工具", page_icon="🧾", layout="centered")
+st.set_page_config(page_title="翡閣進項發票比對工具", page_icon="🧾", layout="centered"
 
-st.title("🧾 進項發票比對工具")
+st.title("🧾 翡閣進項發票比對工具")
 st.caption("上傳內帳與外帳 Excel，自動產生差異報告")
 
 st.divider()
 
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("**📁 內帳（進銷項發票）**")
+    st.markdown("**📁 內帳（進銷項發票）**"
     inner_file = st.file_uploader("上傳內帳 xlsx", type=["xlsx"], key="inner",
                                    label_visibility="collapsed")
 with col2:
