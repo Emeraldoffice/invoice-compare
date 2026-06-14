@@ -218,7 +218,7 @@ def load_inner(f):
         guess = next((c for c in df.columns if "發票" in c and "號" in c), None) or \
                 next((c for c in df.columns if "發票" in c), None)
         if guess:
-            df = df.rename(columns={guess: "發票號碼�})
+            df = df.rename(columns={guess: "發票號碼"})
         else:
             raise ValueError(f"找不到發票號碼欄位，現有欄位：{list(df.columns)}")
     df["發票號碼"] = df["發票號碼"].astype(str).str.strip()
@@ -236,7 +236,7 @@ def load_outer(f):
         guess = next((c for c in df.columns if "發票" in c and "號" in c), None) or \
                 next((c for c in df.columns if "發票" in c), None)
         if guess:
-            df = df.rename(columns={guess: "發票號碼�})
+            df = df.rename(columns={guess: "發票號碼"})
         else:
             raise ValueError(f"找不到發票號碼欄位，現有欄位：{list(df.columns)}")
     df["發票號碼"] = df["發票號碼"].astype(str).str.strip()
