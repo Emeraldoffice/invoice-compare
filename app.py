@@ -25,7 +25,7 @@ with col2:
 if inner_file and outer_file:
     st.divider()
 
-    # ── 偵測內帳工作表 ────────────────────────────────────────────────────
+    # ── 偵測內帳工作表與欄位 ──────────────────────────────────────────────
     inner_file.seek(0)
     xl_inner = pd.ExcelFile(inner_file)
     inner_sheets = xl_inner.sheet_names
@@ -36,6 +36,32 @@ if inner_file and outer_file:
         index=inner_sheets.index(default_sheet),
     )
 
+    inner_file.seek(0)
+    df_inner_preview = pd.read_excel(inner_file, sheet_name=inner_sheet, header=0, nrows=0)
+    inner_cols = df_inner_preview.columns.tolist()
+
+    inv_guess = next((c for c in inner_cols if "發票" in str(c) and "號" in str(c)), None) or \
+                next((c for c in inner_cols if "發票" in str(c)), None) or inner_cols[0]
+    inner_inv_col = st.selectbox(
+        "🔢 請選擇「發票號碼」欄位（內帳）",
+        options=inner_cols,
+        index=inner_cols.index(inv_guess),
+    )
+
+    # ── 偵測外帳欄位 ──────────────────────────────────────────────────────
+    outer_file.seek(0)
+    outer_raw_preview = pd.read_excel(outer_file, sheet_name=0, header=None, nrows=3)
+    outer_cols = outer_raw_preview.iloc[1].tolist()
+    outer_cols_str = [str(c) for c in outer_cols]
+
+    outer_inv_guess = next((c for c in outer_cols_str if "發票" in c and "號" in c), None) or \
+                      next((c for c in outer_cols_str if "發票" in c), None) or outer_cols_str[0]
+    outer_inv_col = st.selectbox(
+        "🔢 請選擇「發票號碼」欄位（外帳）",
+        options=outer_cols_str,
+        index=outer_cols_str.index(outer_inv_guess),
+    )
+
     if st.button("🔍 開始比對", use_container_width=True, type="primary"):
         with st.spinner("比對中，請稍候…"):
 
@@ -43,6 +69,9 @@ if inner_file and outer_file:
             try:
                 inner_file.seek(0)
                 df_inner = pd.read_excel(inner_file, sheet_name=inner_sheet, header=0)
+                df_inner.columns = [str(c) for c in df_inner.columns]
+                if inner_inv_col != "發票號碼":
+                    df_inner = df_inner.rename(columns={inner_inv_col: "發票號碼"})
                 df_inner["發票號碼"] = df_inner["發票號碼"].astype(str).str.strip()
             except Exception as e:
                 st.error(f"讀取內帳失敗：{e}")
@@ -50,10 +79,13 @@ if inner_file and outer_file:
 
             # ── 讀取外帳 ──────────────────────────────────────────────────
             try:
+                outer_file.seek(0)
                 outer_raw = pd.read_excel(outer_file, sheet_name=0, header=None)
                 df_outer = outer_raw.iloc[2:].copy()
-                df_outer.columns = outer_raw.iloc[1].tolist()
+                df_outer.columns = [str(c) for c in outer_raw.iloc[1].tolist()]
                 df_outer = df_outer.reset_index(drop=True)
+                if outer_inv_col != "發票號碼":
+                    df_outer = df_outer.rename(columns={outer_inv_col: "發票號碼"})
                 df_outer["發票號碼"] = df_outer["發票號碼"].astype(str).str.strip()
             except Exception as e:
                 st.error(f"讀取外帳失敗：{e}")
